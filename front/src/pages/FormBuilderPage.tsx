@@ -18,6 +18,7 @@ import {
   verticalListSortingStrategy,
   useSortable,
   arrayMove,
+  sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { getClient } from "@/services/api";
@@ -107,8 +108,14 @@ export const FormBuilderPage: React.FC = () => {
   const [deletedFieldIds, setDeletedFieldIds] = useState<number[]>([]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5, // Require pointer to move 5px to start a drag
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   useEffect(() => {
@@ -139,8 +146,12 @@ export const FormBuilderPage: React.FC = () => {
                   .then((res: AxiosResponse<FieldInstance>) => res.data),
             );
             const fieldInstances = await Promise.all(fieldInstancesPromises);
+            const sanitizedFields = fieldInstances.map(field => ({
+              ...field,
+              uiOptions: Array.isArray(field.uiOptions) ? field.uiOptions : [],
+            }));
             setFields(
-              fieldInstances.sort(
+              sanitizedFields.sort(
                 (a: FieldInstance, b: FieldInstance) => a.position - b.position,
               ),
             );
@@ -159,7 +170,9 @@ export const FormBuilderPage: React.FC = () => {
       name: `${fieldType.slug}_${Date.now()}`,
       position: fields.length,
       validationRules: [],
-      uiOptions: fieldType.defaultConfiguration || [],
+      uiOptions: Array.isArray(fieldType.defaultConfiguration)
+        ? fieldType.defaultConfiguration
+        : [],
       renderStrategy: "default",
       renderOptions: [],
     };
@@ -299,7 +312,7 @@ export const FormBuilderPage: React.FC = () => {
     >
       <div className="flex flex-col h-full space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center p-4">
+        <div className="flex justify-between items-center">
           <h2 className="text-2xl font-semibold">
             {formId ? `Edit Form: ${formName}` : "Create New Form"}
           </h2>
@@ -312,162 +325,163 @@ export const FormBuilderPage: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="flex gap-6 flex-1 min-h-0 p-4">
-          {/* Field Types Sidebar */}
-          <div className="w-[250px] flex-shrink-0 bg-gray-50 p-4 rounded-lg shadow-sm flex flex-col h-full">
-            <h3 className="text-lg font-semibold mb-4">Field Types</h3>
-            <div className="space-y-4 flex-1 overflow-y-auto pr-2">
-              {fieldTypes.map((ft) => (
-                <div
-                  key={ft.id}
-                  className="flex items-center justify-between bg-white p-2 rounded-md border"
-                >
-                  <span>{ft.label}</span>
-                  <Button variant="ghost" size="sm" onClick={() => addField(ft)}>
-                    <PlusCircle className="h-5 w-5" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Form Preview Area */}
-          <div className="flex-1 bg-white p-6 rounded-lg shadow-lg flex flex-col h-full">
-            <h3 className="text-xl font-semibold mb-4">Form Preview</h3>
-            <Input
-              type="text"
-              className="text-3xl font-bold mb-4 w-full border-none focus-visible:ring-0 focus-visible:ring-offset-0"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-            />
-
-            <SortableContext
-              items={fields.map((f) => f.id!)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-4 min-h-[200px] border-dashed border-2 p-4 rounded-md flex-1 overflow-y-auto">
-                {fields.length === 0 && (
-                  <p className="text-center text-gray-500">
-                    Click the [+] button on the left to add fields.
-                  </p>
-                )}
-                {fields.map((field) => (
-                  <SortableField
-                    key={field.id}
-                    field={field}
-                    fieldTypes={fieldTypes}
-                    onEdit={handleFieldEdit}
-                    onDelete={handleDeleteField}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-
-            {selectedField && (
-              <div className="mt-8 p-4 bg-gray-50 rounded-lg shadow-inner space-y-4">
-                <h4 className="text-lg font-semibold">
-                  Configure Field: {selectedField.label}
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="fieldName">Name (for submission data)</Label>
+                <div className="flex gap-6 flex-1 min-h-0 p-4">
+                  {/* Field Types Sidebar */}
+                  <div className="w-[250px] flex-shrink-0 bg-gray-50 p-4 rounded-lg shadow-sm flex flex-col h-full">
+                    <h3 className="text-lg font-semibold mb-4">Field Types</h3>
+                    <div className="space-y-4 flex-1 overflow-y-auto pr-2">
+                      {fieldTypes.map((ft) => (
+                        <div
+                          key={ft.id}
+                          className="flex items-center justify-between bg-white p-2 rounded-md border"
+                        >
+                          <span>{ft.label}</span>
+                          <Button variant="ghost" size="sm" onClick={() => addField(ft)}>
+                            <PlusCircle className="h-5 w-5" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+        
+                  {/* Form Preview Area */}
+                  <div className="flex-1 bg-white p-6 rounded-lg shadow-lg flex flex-col h-full">
+                    <h3 className="text-xl font-semibold mb-4">Form Preview</h3>
                     <Input
-                      id="fieldName"
-                      name="name"
-                      value={selectedField.name || ""}
-                      onChange={handleFieldChange}
+                      type="text"
+                      className="text-3xl font-bold mb-4 w-full border-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                      value={formName}
+                      onChange={(e) => setFormName(e.target.value)}
                     />
+        
+                    <SortableContext
+                      items={fields.map((f) => f.id!)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-4 min-h-[200px] border-dashed border-2 p-4 rounded-md flex-1 overflow-y-auto">
+                        {fields.length === 0 && (
+                          <p className="text-center text-gray-500">
+                            Click the [+] button on the left to add fields.
+                          </p>
+                        )}
+                        {fields.map((field) => (
+                          <SortableField
+                            key={field.id}
+                            field={field}
+                            fieldTypes={fieldTypes}
+                            onEdit={handleFieldEdit}
+                            onDelete={handleDeleteField}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
                   </div>
-                  <div>
-                    <Label htmlFor="fieldLabel">Label</Label>
-                    <Input
-                      id="fieldLabel"
-                      name="label"
-                      value={selectedField.label || ""}
-                      onChange={handleFieldChange}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="fieldPlaceholder">Placeholder</Label>
-                    <Input
-                      id="fieldPlaceholder"
-                      name="placeholder"
-                      value={
-                        (selectedField.uiOptions
-                          ?.filter(Boolean)
-                          .find((o) => o!.startsWith("placeholder:"))
-                          ?.split("placeholder:")[1]) || ""
-                      }
-                      onChange={(e) => {
-                        if (!selectedField) return;
-                        const otherOptions =
-                          selectedField.uiOptions?.filter(
-                            (o) => !o?.startsWith("placeholder:"),
-                          ) || [];
-                        setSelectedField({
-                          ...selectedField,
-                          uiOptions: [
-                            ...otherOptions,
-                            `placeholder:${e.target.value}`,
-                          ],
-                        });
-                      }}
-                    />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="fieldRequired"
-                      checked={
-                        selectedField.validationRules?.includes("required") ||
-                        false
-                      }
-                      onCheckedChange={(checked) => {
-                        if (!selectedField) return;
-                        const otherRules =
-                          selectedField.validationRules?.filter(
-                            (r) => r !== "required",
-                          ) || [];
-                        setSelectedField({
-                          ...selectedField,
-                          validationRules: checked
-                            ? [...otherRules, "required"]
-                            : otherRules,
-                        });
-                      }}
-                    />
-                    <Label htmlFor="fieldRequired">Required</Label>
-                  </div>
-                  <div>
-                    <Label htmlFor="renderStrategy">Render Strategy</Label>
-                    <Input
-                      id="renderStrategy"
-                      name="renderStrategy"
-                      value={selectedField.renderStrategy || ""}
-                      onChange={handleFieldChange}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="renderOptions">Render Options</Label>
-                    <Input
-                      id="renderOptions"
-                      name="renderOptions"
-                      value={selectedField.renderOptions?.join(",") || ""}
-                      onChange={(e) => {
-                          if (!selectedField) return;
-                          setSelectedField({
-                              ...selectedField,
-                              renderOptions: e.target.value ? e.target.value.split(',').map(s => s.trim()) : [],
-                          });
-                      }}
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleSaveFieldConfig}>Apply Changes</Button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+        
+                  {/* Configuration Panel */}
+                  {selectedField && (
+                    <div className="w-[300px] flex-shrink-0 bg-gray-50 p-4 rounded-lg shadow-sm space-y-4">
+                      <h4 className="text-lg font-semibold">
+                        Configure Field: {selectedField.label}
+                      </h4>
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <Label htmlFor="fieldName">Name (for submission data)</Label>
+                                            <Input
+                                              id="fieldName"
+                                              name="name"
+                                              value={selectedField.name || ""}
+                                              onChange={handleFieldChange}
+                                              readOnly // Make the name field read-only
+                                              className="opacity-75" // Reduce opacity for read-only fields
+                                            />                        </div>
+                        <div>
+                          <Label htmlFor="fieldLabel">Label</Label>
+                          <Input
+                            id="fieldLabel"
+                            name="label"
+                            value={selectedField.label || ""}
+                            onChange={handleFieldChange}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="fieldPlaceholder">Placeholder</Label>
+                          <Input
+                            id="fieldPlaceholder"
+                            name="placeholder"
+                            value={
+                              (selectedField.uiOptions
+                                ?.filter(Boolean)
+                                .find((o) => o!.startsWith("placeholder:"))
+                                ?.split("placeholder:")[1]) || ""
+                            }
+                            onChange={(e) => {
+                              if (!selectedField) return;
+                              const otherOptions =
+                                selectedField.uiOptions?.filter(
+                                  (o) => !o?.startsWith("placeholder:"),
+                                ) || [];
+                              setSelectedField({
+                                ...selectedField,
+                                uiOptions: [
+                                  ...otherOptions,
+                                  `placeholder:${e.target.value}`,
+                                ],
+                              });
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="fieldRequired"
+                            checked={
+                              selectedField.validationRules?.includes("required") ||
+                              false
+                            }
+                            onCheckedChange={(checked) => {
+                              if (!selectedField) return;
+                              const otherRules =
+                                selectedField.validationRules?.filter(
+                                  (r) => r !== "required",
+                                ) || [];
+                              setSelectedField({
+                                ...selectedField,
+                                validationRules: checked
+                                  ? [...otherRules, "required"]
+                                  : otherRules,
+                              });
+                            }}
+                          />
+                          <Label htmlFor="fieldRequired">Required</Label>
+                        </div>
+                        <div>
+                          <Label htmlFor="renderStrategy">Render Strategy</Label>
+                          <Input
+                            id="renderStrategy"
+                            name="renderStrategy"
+                            value={selectedField.renderStrategy || ""}
+                            onChange={handleFieldChange}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="renderOptions">Render Options</Label>
+                          <Input
+                            id="renderOptions"
+                            name="renderOptions"
+                            value={selectedField.renderOptions?.join(",") || ""}
+                            onChange={(e) => {
+                                if (!selectedField) return;
+                                setSelectedField({
+                                    ...selectedField,
+                                    renderOptions: e.target.value ? e.target.value.split(',').map(s => s.trim()) : [],
+                                });
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <Button onClick={handleSaveFieldConfig}>Apply Changes</Button>
+                    </div>
+                  )}
+                </div>      </div>
     </DndContext>
   );
 };
