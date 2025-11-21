@@ -1,0 +1,5 @@
+#!/bin/bash
+## Description: Génère les types TypeScript depuis l'API Symfony
+
+# L'URL utilise localhost car Front et Back sont dans le même conteneur
+cd front && npx openapi-typescript http://localhost/api/docs.jsonopenapi?format=json -o src/types/api.d.ts

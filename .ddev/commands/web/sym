@@ -1,0 +1,6 @@
+#!/bin/bash
+## Description: Exécute les commandes Symfony Console dans le dossier back
+## Usage: sym [command] [args]
+## Example: "ddev sym cache:clear"
+
+cd back && php bin/console "$@"

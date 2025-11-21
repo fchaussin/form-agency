@@ -1,0 +1,37 @@
+api_platform:
+    title: Form Agency Restful API
+    description: The Form Agency Restful API documentation.
+    version: 1.0.0
+
+    defaults:
+        stateless: true
+        cache_headers:
+            vary: ['Content-Type', 'Authorization', 'Origin']
+
+    mapping:
+        paths:
+            - '%kernel.project_dir%/src/Entity'
+#            - '%kernel.project_dir%/src/Dto'
+
+    formats:
+        json: ['application/json']
+        jsonld: ['application/ld+json']
+        html: ['text/html']
+        yaml: ['application/x-yaml']
+
+    swagger:
+        versions: [3]
+
+    openapi:
+        contact:
+            name: API Support
+            email: support@example.com
+
+    patch_formats:
+        json: ['application/merge-patch+json']
+
+    exception_to_status:
+        Symfony\Component\Serializer\Exception\ExceptionInterface: 400
+
+    doctrine:
+        enabled: true

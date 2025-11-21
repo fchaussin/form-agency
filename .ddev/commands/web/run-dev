@@ -1,0 +1,5 @@
+#!/bin/bash
+## Description: Lance le serveur de dev Vite
+## Usage: run-dev
+
+cd front && npm run dev -- --host 0.0.0.0 --port 3000

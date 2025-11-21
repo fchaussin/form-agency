@@ -1,0 +1,33 @@
+name: formagency
+type: symfony
+docroot: back/public
+php_version: "8.3"
+webserver_type: nginx-fpm
+xdebug_enabled: false
+additional_hostnames: []
+additional_fqdns: []
+database:
+  type: postgres
+  version: "16"
+use_dns_when_possible: true
+composer_version: "2"
+
+# --- Configuration Monorepo ---
+composer_root: back
+nodejs_version: "20"
+corepack_enable: true
+
+web_extra_exposed_ports:
+  - name: node-vite
+    container_port: 3000
+    http_port: 9998
+    https_port: 9999
+
+web_environment:
+  - VITE_PROJECT_HOST=formagency.ddev.site
+
+hooks:
+  post-start:
+    - exec-host: ddev sync-openapi
+    - exec: echo -e "Depuis cet environnement \e[1;42mnpm run dev\e[0m est accessible avec \e[30;102mddev run-dev\e[0m"
+    - exec-host: ddev run-dev
