@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Chemins racines
+HOST_ROOT=$(pwd)
+CONTAINER_ROOT="/var/www/html"
+
+# Récupération des arguments
+ARGS=("$@")
+LAST_INDEX=$((${#ARGS[@]} - 1))
+LAST_ARG="${ARGS[$LAST_INDEX]}"
+
+# Mapping du chemin si le dernier argument est un fichier du projet
+if [[ -f "$LAST_ARG" ]] && [[ "$LAST_ARG" == "$HOST_ROOT"* ]]; then
+    # 1. Retrait du chemin racine WSL
+    REL_PATH="${LAST_ARG#$HOST_ROOT/}"
+    # 2. Ajout du chemin racine Conteneur
+    TARGET_PATH="$CONTAINER_ROOT/$REL_PATH"
+    # 3. Remplacement de l'argument
+    ARGS[$LAST_INDEX]="$TARGET_PATH"
+fi
+
+# Exécution PHP dans le conteneur via DDEV
+# -s web : Cible le conteneur web
+# -dxdebug.mode=off : Désactive Xdebug pour ne pas polluer la sortie standard
+exec ddev exec -s web php -dxdebug.mode=off "${ARGS[@]}"
