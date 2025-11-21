@@ -21,10 +21,13 @@
 * **Build :** Vite
 * **Langage :** TypeScript
 * **Style :** TailwindCSS
+* **UI :** Shadcn
 * **Dépendances :** Gérées via NPM/Corepack dans `/front` (Node 20).
 
 ## 3. Commandes DDEV (Obligatoires)
 L'exécution directe de commandes à la racine échouera. Utiliser les wrappers DDEV configurés :
+
+Ne jamais executer des commande en direct et utiliser l'envrionnement ddev `ddev npm` `ddev npx` `ddev composer` `ddev exec` `ddev php` `ddev sym`  
 
 | Action | Commande DDEV | Équivalent Exécuté |
 | :--- | :--- | :--- |

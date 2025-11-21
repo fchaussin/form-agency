@@ -1,5 +1,4 @@
 import React from "react";
-import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 
 interface LayoutProps {
@@ -8,12 +7,9 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="flex h-dvh min-h-screen bg-gray-100">
       <Sidebar />
-      <div className="flex flex-col flex-1">
-        <Header />
-        <main className="p-4 flex-1">{children}</main>
-      </div>
+      <main className="p-4 flex-1">{children}</main>
     </div>
   );
 };

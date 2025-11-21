@@ -1,11 +1,12 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { Header } from "./Header";
 
 export const Sidebar: React.FC = () => {
   return (
-    <aside className="w-64 bg-gray-800 text-white p-4 min-h-screen">
+    <aside className="w-64 bg-gray-800 text-white p-4 min-h-screen flex flex-col">
       <div className="text-3xl font-bold mb-6">Form Agency</div>
-      <nav>
+      <nav className="flex-grow">
         <ul>
           <li className="mb-2">
             <Link to="/" className="block hover:bg-gray-700 p-2 rounded">
@@ -48,6 +49,9 @@ export const Sidebar: React.FC = () => {
           </li>
         </ul>
       </nav>
+      <div className="mt-auto pt-4 border-t border-gray-700">
+        <Header />
+      </div>
     </aside>
   );
 };

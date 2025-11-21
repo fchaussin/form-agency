@@ -3,7 +3,6 @@ import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
   DndContext,
@@ -12,6 +11,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  DragEndEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -22,72 +22,89 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { getClient } from "@/services/api";
 import { components } from "@/types/api.d";
+import { fieldComponentRegistry } from "@/components/form-fields";
+import { PlusCircle, Trash2 } from "lucide-react";
+import { v4 as uuidv4 } from "uuid";
+import { AxiosResponse } from "axios";
 
 type FieldInstance = components["schemas"]["FieldInstance"];
-type FieldType = components["schemas"]["FieldType"];
+type LocalFieldInstance = Omit<FieldInstance, "id"> & { id?: string | number };
+type FieldType = components["schemas"]["FieldType-field_type.read"];
 type FormDefinition = components["schemas"]["FormDefinition"];
 
 const SortableField: React.FC<{
-  field: FieldInstance;
-  onEdit: (fieldId: number) => void;
-}> = ({ field, onEdit }) => {
-  const { attributes, setNodeRef, transform, transition } = useSortable({
-    id: field.id!,
-  });
+  field: LocalFieldInstance;
+  fieldTypes: FieldType[];
+  onEdit: (fieldId: any) => void;
+  onDelete: (fieldId: any) => void;
+}> = ({ field, fieldTypes, onEdit, onDelete }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: field.id! });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
 
+  const fieldType = fieldTypes.find(
+    (ft) => `/api/field_types/${ft.id}` === field.component,
+  );
+  const FieldComponent = fieldType
+    ? fieldComponentRegistry[fieldType.component]
+    : null;
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
+      {...listeners}
       className="flex items-center justify-between border p-3 rounded-md bg-gray-50 cursor-grab"
     >
-      <div>
-        <Label>{field.label}</Label>
-        {field.type === "text" && (
-          <Input
-            type="text"
-            placeholder="placeholder"
-            disabled
-            className="w-full"
-          />
+      <div className="flex-grow">
+        {FieldComponent ? (
+          <FieldComponent field={field} />
+        ) : (
+          <div>
+            <Label>{field.label}</Label>
+            <div className="text-xs text-gray-400 mt-1">
+              Type: {fieldType?.component || "Unknown"} (ID: {field.id})
+            </div>
+          </div>
         )}
-        {field.type === "email" && (
-          <Input
-            type="email"
-            placeholder="placeholder"
-            disabled
-            className="w-full"
-          />
-        )}
-        {field.type === "textarea" && (
-          <Textarea placeholder="placeholder" disabled className="w-full" />
-        )}
-        <div className="text-xs text-gray-400 mt-1">
-          Type: {field.type}(ID: {field.id})
-        </div>
       </div>
-      <Button variant="ghost" size="sm" onClick={() => onEdit(field.id!)}>
-        Configure
-      </Button>
+      <div className="flex items-center ml-4">
+        <Button variant="ghost" size="sm" onClick={() => onEdit(field.id!)}>
+          Configure
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onDelete(field.id!)}
+          className="text-red-500 hover:text-red-700"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 };
 
 export const FormBuilderPage: React.FC = () => {
   const { formId } = useParams<{ formId?: string }>();
-  const [fields, setFields] = useState<FieldInstance[]>([]);
+  const [fields, setFields] = useState<LocalFieldInstance[]>([]);
   const [fieldTypes, setFieldTypes] = useState<FieldType[]>([]);
   const [formDef, setFormDef] = useState<FormDefinition | null>(null);
   const [formName, setFormName] = useState("New Form");
-  const [selectedField, setSelectedField] = useState<FieldInstance | null>(
+  const [selectedField, setSelectedField] = useState<LocalFieldInstance | null>(
     null,
   );
+  const [deletedFieldIds, setDeletedFieldIds] = useState<number[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -98,8 +115,8 @@ export const FormBuilderPage: React.FC = () => {
     const fetchFieldTypes = async () => {
       const client = await getClient();
       const response = await client.api_field_types_get_collection();
-      if (response.data && Array.isArray(response.data)) {
-        setFieldTypes(response.data);
+      if (response.data) {
+        setFieldTypes(response.data as FieldType[]);
       }
     };
     fetchFieldTypes();
@@ -111,19 +128,22 @@ export const FormBuilderPage: React.FC = () => {
           id: formId,
         });
         if (response.data) {
-          setFormDef(response.data as FormDefinition);
-          setFormName((response.data as FormDefinition).code || "New Form");
-          if ((response.data as FormDefinition).fields) {
-            const fieldInstancesPromises = (
-              response.data as FormDefinition
-            ).fields!.map((fieldIri) => client.get(fieldIri));
-            const fieldInstancesResponses = await Promise.all(
-              fieldInstancesPromises,
+          const formDefinition = response.data as FormDefinition;
+          setFormDef(formDefinition);
+          setFormName(formDefinition.code || "New Form");
+          if (formDefinition.fields) {
+            const fieldInstancesPromises = formDefinition.fields!.map(
+              (fieldIri) =>
+                client
+                  .get(fieldIri)
+                  .then((res: AxiosResponse<FieldInstance>) => res.data),
             );
-            const fieldInstances = fieldInstancesResponses.map(
-              (res) => res.data as FieldInstance,
+            const fieldInstances = await Promise.all(fieldInstancesPromises);
+            setFields(
+              fieldInstances.sort(
+                (a: FieldInstance, b: FieldInstance) => a.position - b.position,
+              ),
             );
-            setFields(fieldInstances);
           }
         }
       };
@@ -131,32 +151,54 @@ export const FormBuilderPage: React.FC = () => {
     }
   }, [formId]);
 
-  const handleDragEnd = (event: any) => {
-    const { active, over } = event;
-    if (active.id !== over.id) {
-      setFields((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over.id);
-        return arrayMove(items, oldIndex, newIndex);
-      });
-    }
-  };
-
-  const addField = (type: string) => {
-    const newField: FieldInstance = {
-      id: Date.now(),
-      type,
-      label: `New ${type} Field`,
-      name: `new_${type}_${Date.now()}`,
+  const addField = (fieldType: FieldType) => {
+    const newField: LocalFieldInstance = {
+      id: `tmp-${uuidv4()}`,
+      component: `/api/field_types/${fieldType.id}`,
+      label: fieldType.label,
+      name: `${fieldType.slug}_${Date.now()}`,
+      position: fields.length,
+      validationRules: [],
+      uiOptions: fieldType.defaultConfiguration || [],
+      renderStrategy: "default",
+      renderOptions: [],
     };
     setFields((prev) => [...prev, newField]);
   };
 
-  const handleFieldEdit = (fieldId: number) => {
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setFields((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+
+        if (oldIndex === -1 || newIndex === -1) {
+          return items;
+        }
+
+        const reorderedItems = arrayMove(items, oldIndex, newIndex);
+        return reorderedItems.map((item, index) => ({
+          ...item,
+          position: index,
+        }));
+      });
+    }
+  };
+
+  const handleFieldEdit = (fieldId: any) => {
     const fieldToEdit = fields.find((f) => f.id === fieldId);
     if (fieldToEdit) {
       setSelectedField(fieldToEdit);
     }
+  };
+
+  const handleDeleteField = (fieldId: any) => {
+    if (typeof fieldId === "number") {
+      setDeletedFieldIds((prev) => [...prev, fieldId]);
+    }
+    setFields((prev) => prev.filter((f) => f.id !== fieldId));
   };
 
   const handleFieldChange = (
@@ -183,57 +225,61 @@ export const FormBuilderPage: React.FC = () => {
     const client = await getClient();
     let currentFormDef = formDef;
 
-    if (!currentFormDef) {
-      const newForm = {
-        code: formName,
-      };
-      const response = await client.api_form_definitions_post(
-        null,
-        newForm,
-        null,
+    try {
+      if (!currentFormDef) {
+        const newForm = { code: formName };
+        const response = await client.api_form_definitions_post(newForm);
+        currentFormDef = response.data as FormDefinition;
+        setFormDef(currentFormDef);
+      } else if (formName !== currentFormDef.code) {
+        const response = await client.api_form_definitions_id_patch(
+          {
+            id: String(currentFormDef.id),
+          },
+          { code: formName },
+        );
+        currentFormDef = response.data as FormDefinition;
+        setFormDef(currentFormDef);
+      }
+
+      await Promise.all(
+        deletedFieldIds.map((id) =>
+          client.api_field_instances_id_delete({ id: String(id) }),
+        ),
       );
-      currentFormDef = response.data as FormDefinition;
-      setFormDef(currentFormDef);
-    } else if (formName !== currentFormDef.code) {
-      const updatedForm = { ...currentFormDef, code: formName };
-      const response = await client.api_form_definitions_id_patch(
-        {
-          id: String(currentFormDef.id),
-        },
-        updatedForm,
+      setDeletedFieldIds([]);
+
+      const savedFields = await Promise.all(
+        fields.map(async (field) => {
+          const { id, ...payload } = {
+            ...field,
+            form: `/api/form_definitions/${currentFormDef!.id}`,
+          };
+
+          if (typeof field.id === "string" && field.id.startsWith("tmp-")) {
+            const response = await client.api_field_instances_post(payload);
+            return response.data as FieldInstance;
+          } else {
+            const response = await client.api_field_instances_id_patch(
+              { id: String(field.id) },
+              payload as any,
+            );
+            return response.data as FieldInstance;
+          }
+        }),
       );
-      currentFormDef = response.data as FormDefinition;
-      setFormDef(currentFormDef);
+
+      setFields(
+        savedFields.sort(
+          (a: FieldInstance, b: FieldInstance) => a.position - b.position,
+        ),
+      );
+
+      alert("Form saved successfully!");
+    } catch (error: any) {
+      console.error("Failed to save form:", error.response?.data || error);
+      alert("Error saving form. Check console for details.");
     }
-
-    const savedFields = await Promise.all(
-      fields.map(async (field) => {
-        const fieldPayload = {
-          ...field,
-          form: `/api/form_definitions/${currentFormDef!.id}`,
-        };
-        if (String(field.id).startsWith("field-")) {
-          delete fieldPayload.id;
-          const response = await client.api_field_instances_post(
-            null,
-            fieldPayload,
-            null,
-          );
-          return response.data as FieldInstance;
-        } else {
-          const response = await client.api_field_instances_id_patch(
-            {
-              id: String(field.id),
-            },
-            fieldPayload,
-          );
-          return response.data as FieldInstance;
-        }
-      }),
-    );
-    setFields(savedFields);
-
-    alert("Form saved!");
   };
 
   const publishForm = () => {
@@ -246,48 +292,49 @@ export const FormBuilderPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 p-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">
-          {formId ? `Edit Form: ${formName}` : "Create New Form"}
-        </h2>
-        <div className="space-x-2">
-          <Button variant="outline" onClick={saveForm}>
-            Save Draft
-          </Button>
-          <Button onClick={publishForm}>Publish Form</Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="col-span-1 bg-gray-50 p-4 rounded-lg shadow-sm space-y-4">
-          <h3 className="text-lg font-semibold mb-4">Field Types</h3>
-          {fieldTypes.map((ft) => (
-            <Button
-              key={ft.id}
-              variant="secondary"
-              className="w-full"
-              onClick={() => addField(ft.libraryName!)}
-            >
-              {ft.libraryName}
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="space-y-6 p-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-semibold">
+            {formId ? `Edit Form: ${formName}` : "Create New Form"}
+          </h2>
+          <div className="space-x-2">
+            <Button variant="outline" onClick={saveForm}>
+              Save Draft
             </Button>
-          ))}
+            <Button onClick={publishForm}>Publish Form</Button>
+          </div>
         </div>
 
-        <div className="col-span-2 bg-white p-6 rounded-lg shadow-lg">
-          <h3 className="text-xl font-semibold mb-4">Form Preview</h3>
-          <Input
-            type="text"
-            className="text-3xl font-bold mb-4 w-full border-none focus-visible:ring-0 focus-visible:ring-offset-0"
-            value={formName}
-            onChange={(e) => setFormName(e.target.value)}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="col-span-1 bg-gray-50 p-4 rounded-lg shadow-sm space-y-4">
+            <h3 className="text-lg font-semibold mb-4">Field Types</h3>
+            {fieldTypes.map((ft) => (
+              <div
+                key={ft.id}
+                className="flex items-center justify-between bg-white p-2 rounded-md border"
+              >
+                <span>{ft.label}</span>
+                <Button variant="ghost" size="sm" onClick={() => addField(ft)}>
+                  <PlusCircle className="h-5 w-5" />
+                </Button>
+              </div>
+            ))}
+          </div>
 
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
+          <div className="col-span-2 bg-white p-6 rounded-lg shadow-lg">
+            <h3 className="text-xl font-semibold mb-4">Form Preview</h3>
+            <Input
+              type="text"
+              className="text-3xl font-bold mb-4 w-full border-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              value={formName}
+              onChange={(e) => setFormName(e.target.value)}
+            />
+
             <SortableContext
               items={fields.map((f) => f.id!)}
               strategy={verticalListSortingStrategy}
@@ -295,69 +342,102 @@ export const FormBuilderPage: React.FC = () => {
               <div className="space-y-4 min-h-[200px] border-dashed border-2 p-4 rounded-md">
                 {fields.length === 0 && (
                   <p className="text-center text-gray-500">
-                    Drag fields here or click buttons on the left to add.
+                    Click the [+] button on the left to add fields.
                   </p>
                 )}
                 {fields.map((field) => (
                   <SortableField
                     key={field.id}
                     field={field}
+                    fieldTypes={fieldTypes}
                     onEdit={handleFieldEdit}
+                    onDelete={handleDeleteField}
                   />
                 ))}
               </div>
             </SortableContext>
-          </DndContext>
 
-          {selectedField && (
-            <div className="mt-8 p-4 bg-gray-50 rounded-lg shadow-inner space-y-4">
-              <h4 className="text-lg font-semibold">
-                Configure Field: {selectedField.label}
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="fieldLabel">Label</Label>
-                  <Input
-                    id="fieldLabel"
-                    name="label"
-                    value={selectedField.label || ""}
-                    onChange={handleFieldChange}
-                  />
+            {selectedField && (
+              <div className="mt-8 p-4 bg-gray-50 rounded-lg shadow-inner space-y-4">
+                <h4 className="text-lg font-semibold">
+                  Configure Field: {selectedField.label}
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="fieldName">Name (for submission data)</Label>
+                    <Input
+                      id="fieldName"
+                      name="name"
+                      value={selectedField.name || ""}
+                      onChange={handleFieldChange}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fieldLabel">Label</Label>
+                    <Input
+                      id="fieldLabel"
+                      name="label"
+                      value={selectedField.label || ""}
+                      onChange={handleFieldChange}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fieldPlaceholder">Placeholder</Label>
+                    <Input
+                      id="fieldPlaceholder"
+                      name="placeholder"
+                      value={
+                        (selectedField.uiOptions
+                          ?.filter(Boolean)
+                          .find((o) => o!.startsWith("placeholder:"))
+                          ?.split("placeholder:")[1]) || ""
+                      }
+                      onChange={(e) => {
+                        if (!selectedField) return;
+                        const otherOptions =
+                          selectedField.uiOptions?.filter(
+                            (o) => !o?.startsWith("placeholder:"),
+                          ) || [];
+                        setSelectedField({
+                          ...selectedField,
+                          uiOptions: [
+                            ...otherOptions,
+                            `placeholder:${e.target.value}`,
+                          ],
+                        });
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="fieldRequired"
+                      checked={
+                        selectedField.validationRules?.includes("required") ||
+                        false
+                      }
+                      onCheckedChange={(checked) => {
+                        if (!selectedField) return;
+                        const otherRules =
+                          selectedField.validationRules?.filter(
+                            (r) => r !== "required",
+                          ) || [];
+                        setSelectedField({
+                          ...selectedField,
+                          validationRules: checked
+                            ? [...otherRules, "required"]
+                            : otherRules,
+                        });
+                      }}
+                    />
+                    <Label htmlFor="fieldRequired">Required</Label>
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="fieldPlaceholder">Placeholder</Label>
-                  <Input
-                    id="fieldPlaceholder"
-                    name="placeholder"
-                    value={selectedField.uiOptions?.join("") || ""}
-                    onChange={handleFieldChange}
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="fieldRequired"
-                    checked={(selectedField.validationRules || []).includes(
-                      "required",
-                    )}
-                    onCheckedChange={(checked) => {
-                      const rules = selectedField.validationRules || [];
-                      const newRules = checked
-                        ? [...rules, "required"]
-                        : rules.filter((r) => r !== "required");
-                      setSelectedField({
-                        ...selectedField,
-                        validationRules: newRules,
-                      });
-                    }}
-                  />
-                  <Label htmlFor="fieldRequired">Required</Label>
-                </div>
+                <Button onClick={handleSaveFieldConfig}>Apply Changes</Button>
               </div>
-              <Button onClick={handleSaveFieldConfig}>Apply Changes</Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </DndContext>
   );
 };
