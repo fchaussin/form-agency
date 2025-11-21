@@ -1,10 +1,25 @@
 # FormAgency
 
-A full-stack Monorepo application (Symfony + React) orchestrated by DDEV.
+A full-stack WIP Monorepo application (Symfony + React) orchestrated by DDEV.
+
+**Regain control over your data collection.**
+
+Designed for web agencies to manage forms across their clients' static websites.
+
+FormAgency is a self-hosted microservice designed to replace third-party SaaS form builders. It provides a complete infrastructure to build, host, and process forms while keeping full sovereignty over your data.
+
+It features a comprehensive **Admin Panel** for management and a lightweight **JS Client** to embed forms seamlessly into any project (Static sites, JAMstack, SPA).
+
+**Key Features:**
+* **Visual Admin Panel:** Intuitive drag-and-drop builder & submission dashboard.
+* **Universal Embed:** Drop-in HTML/JS snippet to integrate forms anywhere.
+* **Multi-Tenancy:** Manage multiple sites and users from a single instance.
+* **Data Hub:** Secure storage with automated dispatch (Webhooks, Emails).
+* **Docker Ready:** Easy deployment on your own infrastructure.
 
 ## 🏗 Architecture Overview
 
-This project uses a **Monorepo structure** running inside a **single DDEV container**.
+This project uses a **Monorepo structure** running inside a ready to use **single DDEV container**.
 
 * **Root:** Contains the DDEV configuration orchestrating the environment.
 * **Backend (`/back`):** Symfony 7.3 API (API Platform) running on Nginx/PHP-FPM.
@@ -80,9 +95,9 @@ To simplify the Monorepo management, custom DDEV commands are mapped to the spec
 
 | Command | Description | Target Scope |
 | :--- | :--- | :--- |
-| **`ddev sym [cmd]`** | Runs `php bin/console` commands. <br> *Example: `ddev sym cache:clear`* | `/back` |
+| **`ddev sym [cmd]`** | Runs Symfony `php bin/console` commands. <br> *Example: `ddev sym cache:clear`* | `/back` |
 | **`ddev run-dev`** | Starts the Vite development server (HMR enabled). | `/front` |
-| **`ddev openapi`** | Generates TypeScript types from the Symfony API. | `/front` |
+| **`ddev sync-openapi`** | Generates TypeScript types from the Symfony ApiPlatform. | `/front` |
 | **`ddev ssh`** | Opens a shell inside the web container. | Root |
 
 ### Running the Frontend
