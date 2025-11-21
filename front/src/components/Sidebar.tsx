@@ -4,7 +4,7 @@ import { Header } from "./Header";
 
 export const Sidebar: React.FC = () => {
   return (
-    <aside className="w-64 bg-gray-800 text-white p-4 min-h-screen flex flex-col">
+    <aside className="w-64 bg-gray-800 text-white p-4 h-dvh min-h-screen flex flex-col">
       <div className="text-3xl font-bold mb-6">Form Agency</div>
       <nav className="flex-grow">
         <ul>

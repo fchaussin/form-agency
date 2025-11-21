@@ -297,8 +297,9 @@ export const FormBuilderPage: React.FC = () => {
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
     >
-      <div className="space-y-6 p-4">
-        <div className="flex justify-between items-center">
+      <div className="flex flex-col h-full space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center p-4">
           <h2 className="text-2xl font-semibold">
             {formId ? `Edit Form: ${formName}` : "Create New Form"}
           </h2>
@@ -310,23 +311,28 @@ export const FormBuilderPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="col-span-1 bg-gray-50 p-4 rounded-lg shadow-sm space-y-4">
+        {/* Main Content */}
+        <div className="flex gap-6 flex-1 min-h-0 p-4">
+          {/* Field Types Sidebar */}
+          <div className="w-[250px] flex-shrink-0 bg-gray-50 p-4 rounded-lg shadow-sm flex flex-col h-full">
             <h3 className="text-lg font-semibold mb-4">Field Types</h3>
-            {fieldTypes.map((ft) => (
-              <div
-                key={ft.id}
-                className="flex items-center justify-between bg-white p-2 rounded-md border"
-              >
-                <span>{ft.label}</span>
-                <Button variant="ghost" size="sm" onClick={() => addField(ft)}>
-                  <PlusCircle className="h-5 w-5" />
-                </Button>
-              </div>
-            ))}
+            <div className="space-y-4 flex-1 overflow-y-auto pr-2">
+              {fieldTypes.map((ft) => (
+                <div
+                  key={ft.id}
+                  className="flex items-center justify-between bg-white p-2 rounded-md border"
+                >
+                  <span>{ft.label}</span>
+                  <Button variant="ghost" size="sm" onClick={() => addField(ft)}>
+                    <PlusCircle className="h-5 w-5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="col-span-2 bg-white p-6 rounded-lg shadow-lg">
+          {/* Form Preview Area */}
+          <div className="flex-1 bg-white p-6 rounded-lg shadow-lg flex flex-col h-full">
             <h3 className="text-xl font-semibold mb-4">Form Preview</h3>
             <Input
               type="text"
@@ -339,7 +345,7 @@ export const FormBuilderPage: React.FC = () => {
               items={fields.map((f) => f.id!)}
               strategy={verticalListSortingStrategy}
             >
-              <div className="space-y-4 min-h-[200px] border-dashed border-2 p-4 rounded-md">
+              <div className="space-y-4 min-h-[200px] border-dashed border-2 p-4 rounded-md flex-1 overflow-y-auto">
                 {fields.length === 0 && (
                   <p className="text-center text-gray-500">
                     Click the [+] button on the left to add fields.
@@ -430,6 +436,30 @@ export const FormBuilderPage: React.FC = () => {
                       }}
                     />
                     <Label htmlFor="fieldRequired">Required</Label>
+                  </div>
+                  <div>
+                    <Label htmlFor="renderStrategy">Render Strategy</Label>
+                    <Input
+                      id="renderStrategy"
+                      name="renderStrategy"
+                      value={selectedField.renderStrategy || ""}
+                      onChange={handleFieldChange}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="renderOptions">Render Options</Label>
+                    <Input
+                      id="renderOptions"
+                      name="renderOptions"
+                      value={selectedField.renderOptions?.join(",") || ""}
+                      onChange={(e) => {
+                          if (!selectedField) return;
+                          setSelectedField({
+                              ...selectedField,
+                              renderOptions: e.target.value ? e.target.value.split(',').map(s => s.trim()) : [],
+                          });
+                      }}
+                    />
                   </div>
                 </div>
                 <Button onClick={handleSaveFieldConfig}>Apply Changes</Button>
